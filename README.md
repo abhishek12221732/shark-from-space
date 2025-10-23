@@ -15,7 +15,7 @@ that can transmit shark activity to a cloud system in real time.
 2. Design a conceptual IoT tag for real-time shark behavior tracking.
 
 ## Timeline
-- Week 1: Data gathering + patent concept + model plan
-- Week 2: Model building
-- Week 3: Evaluation + tag concept documentation
-- Week 4: Final report + presentation
+- Stage 1: Data gathering + patent concept + model plan
+- Stage 2: Model building
+- Stage 3: Evaluation + tag concept documentation
+- Stage 4: Final report + presentation
