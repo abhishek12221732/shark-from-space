@@ -4,7 +4,7 @@ using satellite data (SST, chlorophyll, salinity, etc.) and propose a concept ta
 that can transmit shark activity to a cloud system in real time.
 
 ## Team
-- Abhishek Kumar (Full Stack)
+- Abhishek Kumar 
 - Abdul Kadir
 - Rajdeep Ghosh
 - Mansi Kumari
