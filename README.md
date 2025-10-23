@@ -4,8 +4,11 @@ using satellite data (SST, chlorophyll, salinity, etc.) and propose a concept ta
 that can transmit shark activity to a cloud system in real time.
 
 ## Team
-- Abhishek Kumar (Lead, Full Stack)
-- [Members' Names]
+- Abhishek Kumar (Full Stack)
+- Abdul Kadir
+- Rajdeep Ghosh
+- Mansi Kumari
+- Sania
 
 ## Objectives
 1. Build a predictive model using NASA ocean data.
