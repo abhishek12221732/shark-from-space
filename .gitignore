@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Data & Models
+data/
+models/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Environment files
+.env
+*.env.local
+
+# Node / React
+node_modules/
+build/
+npm-debug.log
+yarn-error.log
