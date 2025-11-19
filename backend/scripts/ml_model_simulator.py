@@ -1,31 +1,27 @@
 import random
 import time
-from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic_settings import BaseSettings
+import sys
 from pathlib import Path
 import asyncio
 
-# --- Configuration ---
-BASE_DIR = Path(__file__).resolve().parent 
-ENV_FILE_PATH = BASE_DIR / ".env" 
+# Add parent directory to path to import app modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-class Settings(BaseSettings):
-    mongo_connection_string: str
-    class Config:
-        env_file = ENV_FILE_PATH
-        env_file_encoding = 'utf-8'
-
-settings = Settings()
+from motor.motor_asyncio import AsyncIOMotorClient
+from app.core.config import settings
+from app.core.database import get_hotspots_collection
 
 # --- MongoDB Connection ---
 try:
-    client = AsyncIOMotorClient(settings.mongo_connection_string)
-    db = client.shark_database
-    hotspots_collection = db.get_collection("hotspots") # <-- NEW COLLECTION
+    from app.core.database import get_database
+    db = get_database()
+    if db is None:
+        raise Exception("Database connection failed")
+    hotspots_collection = db.get_collection("hotspots")
     print("Successfully connected to MongoDB Atlas.")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
-    client = None
+    hotspots_collection = None
 
 async def generate_dummy_hotspots():
     """

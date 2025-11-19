@@ -40,13 +40,25 @@ function App() {
   useEffect(() => {
     const fetchEvents = () => {
       fetch('http://127.0.0.1:8000/events')
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            // Handle HTTP errors (e.g., 500)
+            return { status: 'error', events: [] };
+          }
+          return response.json();
+        })
         .then(data => {
-          if (data.events) {
+          if (data.status === 'success' && data.events) {
             setLiveEvents(data.events);
+          } else {
+            // Handle error or empty response
+            setLiveEvents([]);
           }
         })
-        .catch(error => console.error("Error fetching events:", error));
+        .catch(error => {
+          console.error("Error fetching events:", error);
+          setLiveEvents([]);
+        });
     };
 
     fetchEvents(); // Fetch immediately on load
@@ -56,20 +68,45 @@ function App() {
 
   // 3. Fetch Hotspot Predictions (Once on load)
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/hotspots')
-      .then(response => response.json())
-      .then(data => {
-        if (data.hotspots) {
-          // Format for the heatmap: [lat, lon, intensity]
-          const formattedHotspots = data.hotspots.map(h => [
-            h.latitude,
-            h.longitude,
-            h.prediction_value,
-          ]);
-          setHotspots(formattedHotspots);
+    const fetchHotspots = async () => {
+      try {
+        // Try simulated hotspots first
+        const response = await fetch('http://127.0.0.1:8000/hotspots');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success' && data.hotspots) {
+            // Format for the heatmap: [lat, lon, intensity]
+            const formattedHotspots = data.hotspots.map(h => [
+              h.latitude,
+              h.longitude,
+              h.prediction_value,
+            ]);
+            setHotspots(formattedHotspots);
+            return;
+          }
         }
-      })
-      .catch(error => console.error("Error fetching hotspots:", error));
+        
+        // Fallback to real ML predictions if simulated fails
+        const realResponse = await fetch('http://127.0.0.1:8000/hotspots/real');
+        if (realResponse.ok) {
+          const realData = await realResponse.json();
+          if (realData.status === 'success' && realData.hotspots) {
+            const formattedHotspots = realData.hotspots.map(h => [
+              h.latitude,
+              h.longitude,
+              h.prediction_value,
+            ]);
+            setHotspots(formattedHotspots);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching hotspots:", error);
+        setHotspots([]);
+      }
+    };
+
+    fetchHotspots();
   }, []);
 
 

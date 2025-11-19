@@ -5,8 +5,8 @@ import math
 import json
 from datetime import datetime, timezone
 
-# The API endpoint you created in main.py
-API_ENDPOINT = "http://127.0.0.1:8000/ingest_tag_event"
+# The API endpoint
+API_ENDPOINT = "http://127.0.0.1:8000/events/ingest"
 
 def simulate_tag(tag_id, start_lat, start_lon):
     """
