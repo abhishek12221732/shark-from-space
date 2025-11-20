@@ -5,11 +5,12 @@ This is the entry point for the Shark Foraging Project API.
 """
 
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import get_database
+from app.core.database import get_database, close_database
 from app.api import api_router
 
 # Configure logging
@@ -19,6 +20,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown."""
+    # Startup
+    logger.info(f"Starting {settings.api_title} v{settings.api_version}")
+    
+    # Test database connection
+    db = get_database()
+    if db is None:
+        logger.warning("Database connection failed - some features may be unavailable")
+    else:
+        logger.info("Database connection established")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down application")
+    close_database()
+
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.api_title,
@@ -26,6 +48,7 @@ app = FastAPI(
     description="API for shark habitat prediction and tracking",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -68,29 +91,6 @@ async def health_check():
     }
 
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    logger.info(f"Starting {settings.api_title} v{settings.api_version}")
-    
-    # Test database connection
-    db = get_database()
-    if db is None:
-        logger.warning("Database connection failed - some features may be unavailable")
-    else:
-        logger.info("Database connection established")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down application")
-    from app.core.database import close_database
-    close_database()
-
-
 if __name__ == "__main__":
     import uvicorn
     
@@ -100,6 +100,6 @@ if __name__ == "__main__":
         host=settings.api_host,
         port=settings.api_port,
         reload=True,
-        reload_dirs=["backend/app"]
+        reload_dirs=["app"]
     )
 
