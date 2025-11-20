@@ -6,7 +6,7 @@ venv/
 env/
 
 # Data & Models
-data/
+# data/  # Commented out to allow pushing data files
 models/
 
 # IDE / OS
