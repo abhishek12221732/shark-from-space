@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, Polyline } from 'react-leaflet';
 import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -57,6 +57,33 @@ const styles = {
   validationCard: {
     backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px',
     padding: '12px', marginBottom: '20px'
+  },
+  // --- NEW: RIGHT TRACKING PANEL STYLES ---
+  trackerPanel: {
+    position: 'absolute', top: '20px', right: '20px', width: '320px',
+    backgroundColor: '#ffffff', borderRadius: '12px', padding: '20px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 1000,
+    border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column',
+    maxHeight: 'calc(100vh - 40px)'
+  },
+  closeBtn: {
+    position: 'absolute', top: '15px', right: '15px', background: 'none',
+    border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#94a3b8'
+  },
+  statGrid: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px'
+  },
+  statBox: {
+    backgroundColor: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0'
+  },
+  statLabel: { fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase' },
+  statValue: { fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a' },
+  historyList: {
+    flex: 1, overflowY: 'auto', borderTop: '1px solid #e2e8f0', paddingTop: '10px',
+    fontSize: '0.8rem', color: '#475569'
+  },
+  historyItem: {
+    padding: '8px 0', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between'
   }
 };
 
@@ -66,12 +93,9 @@ function RecenterButton({ sharks, fallbackCenter }) {
 
   const handleRecenter = () => {
     if (sharks && sharks.length > 0) {
-      // Create a bounding box around all current sharks
       const bounds = L.latLngBounds(sharks.map(s => [s.latitude, s.longitude]));
-      // Fly to that box, adding 80px of padding so they aren't squished to the edge
       map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5, maxZoom: 13 });
     } else {
-      // If no sharks, just go to the center
       map.flyTo(fallbackCenter, 11, { duration: 1.5 });
     }
   };
@@ -80,13 +104,13 @@ function RecenterButton({ sharks, fallbackCenter }) {
     <button
       onClick={handleRecenter}
       style={{
-        position: 'absolute', top: '20px', right: '20px', zIndex: 1000,
-        padding: '8px 16px', backgroundColor: '#ffffff', color: '#0f172a',
-        border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontWeight: 'bold', display: 'flex', gap: '6px'
+        position: 'absolute', bottom: '30px', right: '20px', zIndex: 1000, // Moved to bottom right
+        padding: '10px 20px', backgroundColor: '#0284c7', color: '#ffffff',
+        border: 'none', borderRadius: '6px', cursor: 'pointer',
+        boxShadow: '0 4px 6px rgba(2, 132, 199, 0.3)', fontWeight: 'bold', display: 'flex', gap: '6px'
       }}
     >
-      🎯 Track Sharks
+      🎯 Frame All Sharks
     </button>
   );
 }
@@ -100,6 +124,9 @@ function App() {
   const [truthHotspots, setTruthHotspots] = useState([]);
   const [activeLayer, setActiveLayer] = useState('ml');
   const [loadingLayer, setLoadingLayer] = useState(true);
+  
+  // --- NEW: SELECTED SHARK STATE ---
+  const [selectedSharkId, setSelectedSharkId] = useState(null);
   
   const centerPos = [-13.00, 46.23];
 
@@ -145,7 +172,8 @@ function App() {
 
   useEffect(() => {
     const fetchEvents = () => {
-      fetch('http://127.0.0.1:8000/events?limit=50')
+      // BUMPED LIMIT TO 200 to get a good tail of historical data for the path
+      fetch('http://127.0.0.1:8000/events?limit=200')
         .then(res => res.ok ? res.json() : { events: [] })
         .then(data => { if (data.events) setLiveEvents(data.events); })
         .catch(err => console.error("Event polling error:", err));
@@ -157,6 +185,13 @@ function App() {
 
   const uniqueSharks = Array.from(new Set(liveEvents.map(e => e.tag_id)))
     .map(id => liveEvents.find(e => e.tag_id === id));
+
+  // --- NEW: FILTER SELECTED SHARK DATA ---
+  const selectedSharkEvents = selectedSharkId 
+    ? liveEvents.filter(e => e.tag_id === selectedSharkId).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    : [];
+  const activeShark = selectedSharkEvents[0]; // Most recent data point
+  const sharkPath = selectedSharkEvents.map(e => [e.latitude, e.longitude]); // Array of coords for the trail
 
   return (
     <div style={styles.container}>
@@ -215,13 +250,18 @@ function App() {
            </div>
         </div>
 
-        <div style={styles.sectionTitle}>Live Telemetry Feed</div>
+        <div style={styles.sectionTitle}>Global Event Feed</div>
         <div style={styles.eventList}>
           {liveEvents.length === 0 ? (
              <div style={{color: '#94a3b8', fontStyle: 'italic'}}>Waiting for sensor data...</div>
           ) : (
+            // Only show the last 15 overall events in the sidebar
             liveEvents.slice(0, 15).map((evt) => (
-              <div key={evt.id} style={styles.eventCard(evt.event_trigger)}>
+              <div 
+                key={evt.id} 
+                style={{...styles.eventCard(evt.event_trigger), cursor: 'pointer', opacity: selectedSharkId && selectedSharkId !== evt.tag_id ? 0.5 : 1}}
+                onClick={() => setSelectedSharkId(evt.tag_id)} // Clicking feed also selects shark
+              >
                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
                   <strong style={{color: '#0f172a'}}>{evt.tag_id}</strong>
                   <span style={{fontSize: '0.75rem', color: '#64748b'}}>
@@ -230,9 +270,6 @@ function App() {
                 </div>
                 <div style={{fontSize: '0.85rem', color: '#334155'}}>
                   {evt.event_trigger === 'possible_feeding' ? '🍖 FEEDING EVENT' : '🏊 Transiting'}
-                </div>
-                <div style={{fontSize: '0.75rem', marginTop:'4px', color:'#64748b'}}>
-                  Conf: {(evt.event_confidence * 100).toFixed(0)}% | Depth: {evt.depth_m}m
                 </div>
               </div>
             ))
@@ -249,7 +286,6 @@ function App() {
           wheelPxPerZoomLevel={120} 
           style={{ height: '100%', width: '100%' }}
         >
-          {/* DYNAMIC RECENTER BUTTON INJECTED HERE */}
           <RecenterButton sharks={uniqueSharks} fallbackCenter={centerPos} />
 
           <TileLayer
@@ -287,27 +323,72 @@ function App() {
             />
           )}
 
+          {/* --- NEW: SHARK PATH POLYLINE --- */}
+          {selectedSharkId && sharkPath.length > 1 && (
+            <Polyline 
+              positions={sharkPath} 
+              color="#0284c7" 
+              weight={3} 
+              dashArray="5, 10" 
+              opacity={0.8}
+            />
+          )}
+
           {uniqueSharks.map(evt => (
-             <Marker key={evt.tag_id} position={[evt.latitude, evt.longitude]}>
-               <Popup>
-                 <div style={{minWidth: '150px'}}>
-                   <h3 style={{margin: '0 0 5px 0', color: '#0f172a'}}>{evt.tag_id}</h3>
-                   <div style={{marginBottom: '5px'}}>
-                     Status: <strong>{evt.event_trigger}</strong>
-                   </div>
-                   <div style={{fontSize: '0.9em', color: '#334155'}}>
-                    Temp: {evt.env_temperature_c}°C<br/>
-                    Depth: {evt.depth_m}m<br/>
-                    Battery: {evt.battery_level_pct}%
-                   </div>
-                   <div style={{fontSize: '0.8em', color: '#64748b', marginTop: '5px'}}>
-                     Last seen: {new Date(evt.timestamp).toLocaleTimeString()}
-                   </div>
-                 </div>
-               </Popup>
-             </Marker>
+             <Marker 
+                key={evt.tag_id} 
+                position={[evt.latitude, evt.longitude]}
+                // Replaced Popup with click handler
+                eventHandlers={{
+                  click: () => {
+                    setSelectedSharkId(evt.tag_id);
+                  },
+                }}
+             />
           ))}
         </MapContainer>
+
+        {/* --- NEW: RIGHT TRACKING PANEL --- */}
+        {selectedSharkId && activeShark && (
+          <div style={styles.trackerPanel}>
+            <button style={styles.closeBtn} onClick={() => setSelectedSharkId(null)}>✖</button>
+            <h2 style={{margin: '0 0 5px 0', fontSize: '1.4rem', color: '#0f172a'}}>Target: {activeShark.tag_id}</h2>
+            
+            <div style={{display: 'inline-block', backgroundColor: activeShark.event_trigger === 'possible_feeding' ? '#fef3c7' : '#e0f2fe', color: activeShark.event_trigger === 'possible_feeding' ? '#b45309' : '#0369a1', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '15px', alignSelf: 'flex-start'}}>
+              {activeShark.event_trigger === 'possible_feeding' ? '🍖 FEEDING' : '🏊 TRANSITING'}
+            </div>
+
+            <div style={styles.statGrid}>
+              <div style={styles.statBox}>
+                <div style={styles.statLabel}>Current Depth</div>
+                <div style={styles.statValue}>{activeShark.depth_m}m</div>
+              </div>
+              <div style={styles.statBox}>
+                <div style={styles.statLabel}>Water Temp</div>
+                <div style={styles.statValue}>{activeShark.env_temperature_c}°C</div>
+              </div>
+              <div style={styles.statBox}>
+                <div style={styles.statLabel}>Battery</div>
+                <div style={styles.statValue}>{activeShark.battery_level_pct}%</div>
+              </div>
+              <div style={styles.statBox}>
+                <div style={styles.statLabel}>ML Confidence</div>
+                <div style={styles.statValue}>{(activeShark.event_confidence * 100).toFixed(0)}%</div>
+              </div>
+            </div>
+
+            <div style={{fontSize: '0.85rem', fontWeight: 'bold', color: '#0f172a', marginBottom: '5px'}}>Recent Path History</div>
+            <div style={styles.historyList}>
+              {selectedSharkEvents.map((e, idx) => (
+                <div key={idx} style={styles.historyItem}>
+                  <span>{new Date(e.timestamp).toLocaleTimeString()}</span>
+                  <span style={{fontFamily: 'monospace'}}>[{e.latitude.toFixed(3)}, {e.longitude.toFixed(3)}]</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );
