@@ -1,180 +1,314 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3'; // <-- Use named import
+import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import './App.css'; // <-- Re-enabled CSS
 
-// We can leave the icon fix commented out for now unless markers break
-// import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-// import markerIcon from 'leaflet/dist/images/marker-icon.png';
-// import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// --- 1. LEAFLET ICON FIX (CRITICAL) ---
+// This fixes the issue where markers appear as broken images
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// delete L.Icon.Default.prototype._getIconUrl;
-// L.Icon.Default.mergeOptions({
-//   iconRetinaUrl: markerIcon2x,
-//   iconUrl: markerIcon,
-//   shadowUrl: markerShadow,
-// });
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
+// --- 2. INLINE STYLES (For a Dark Mode Dashboard) ---
+// We use a style object here to ensure the UI looks good even without external CSS files.
+const styles = {
+  container: {
+    display: 'flex',
+    height: '100vh',
+    width: '100vw',
+    fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    backgroundColor: '#0f172a', // Dark slate
+    color: '#f8fafc', // Light text
+    overflow: 'hidden',
+  },
+  sidebar: {
+    width: '350px',
+    backgroundColor: '#1e293b', // Slightly lighter slate
+    borderRight: '1px solid #334155',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '20px',
+    zIndex: 1000,
+    boxShadow: '2px 0 10px rgba(0,0,0,0.3)',
+  },
+  header: {
+    marginBottom: '20px',
+    borderBottom: '1px solid #334155',
+    paddingBottom: '15px',
+  },
+  title: {
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+    color: '#38bdf8', // Light blue
+    margin: 0,
+  },
+  subtitle: {
+    fontSize: '0.85rem',
+    color: '#94a3b8',
+    marginTop: '5px',
+  },
+  statusCard: {
+    backgroundColor: '#0f172a',
+    padding: '15px',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    border: '1px solid #334155',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusIndicator: (isOnline) => ({
+    height: '10px',
+    width: '10px',
+    borderRadius: '50%',
+    backgroundColor: isOnline ? '#22c55e' : '#ef4444', // Green or Red
+    display: 'inline-block',
+    marginRight: '8px',
+    boxShadow: isOnline ? '0 0 8px #22c55e' : 'none',
+  }),
+  sectionTitle: {
+    fontSize: '0.9rem',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    color: '#64748b',
+    marginTop: '20px',
+    marginBottom: '10px',
+    fontWeight: '600',
+  },
+  toggleContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    marginBottom: '10px',
+  },
+  eventList: {
+    flex: 1,
+    overflowY: 'auto',
+    marginTop: '10px',
+    paddingRight: '5px',
+  },
+  eventCard: (type) => ({
+    backgroundColor: type === 'possible_feeding' ? 'rgba(245, 158, 11, 0.1)' : '#0f172a',
+    borderLeft: type === 'possible_feeding' ? '4px solid #f59e0b' : '4px solid #38bdf8',
+    padding: '12px',
+    borderRadius: '4px',
+    marginBottom: '10px',
+    fontSize: '0.9rem',
+  }),
+  mapWrapper: {
+    flex: 1,
+    position: 'relative',
+  }
+};
 
 function App() {
+  // --- STATE ---
   const [apiStatus, setApiStatus] = useState('Connecting...');
-  const [liveEvents, setLiveEvents] = useState([]); // <-- Holds tag data
-  const [hotspots, setHotspots] = useState([]); // <-- Holds ML predictions
-
-  // Base map position
-  const mapPosition = [-13.00, 46.23];
-
-  // --- Data Fetching ---
-
-  // 1. Fetch API Status
+  const [isOnline, setIsOnline] = useState(false);
+  const [liveEvents, setLiveEvents] = useState([]);
+  const [hotspots, setHotspots] = useState([]);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [loadingHotspots, setLoadingHotspots] = useState(true);
+  
+  // Map configuration
+  const centerPos = [-13.00, 46.23]; // Mayotte/Mozambique Channel
+  
+  // --- EFFECT 1: API HEALTH CHECK ---
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/') // Hit your backend's root
-      .then(response => response.json())
-      .then(data => setApiStatus(data.status || 'Connected'))
-      .catch(() => setApiStatus('Error: Could not connect to API'));
-  }, []);
-
-  // 2. Fetch Live Tag Events (Polling)
-  useEffect(() => {
-    const fetchEvents = () => {
-      fetch('http://127.0.0.1:8000/events')
-        .then(response => {
-          if (!response.ok) {
-            // Handle HTTP errors (e.g., 500)
-            return { status: 'error', events: [] };
-          }
-          return response.json();
-        })
+    const checkHealth = () => {
+      fetch('http://127.0.0.1:8000/')
+        .then(res => res.json())
         .then(data => {
-          if (data.status === 'success' && data.events) {
-            setLiveEvents(data.events);
-          } else {
-            // Handle error or empty response
-            setLiveEvents([]);
-          }
+          setApiStatus(data.status || 'Connected');
+          setIsOnline(true);
         })
-        .catch(error => {
-          console.error("Error fetching events:", error);
-          setLiveEvents([]);
+        .catch(() => {
+          setApiStatus('Offline / Error');
+          setIsOnline(false);
         });
     };
-
-    fetchEvents(); // Fetch immediately on load
-    const interval = setInterval(fetchEvents, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval); // Cleanup on unmount
+    checkHealth();
+    const interval = setInterval(checkHealth, 10000); // Check every 10s
+    return () => clearInterval(interval);
   }, []);
 
-  // 3. Fetch Hotspot Predictions (Once on load)
+  // --- EFFECT 2: FETCH HOTSPOTS (REAL -> FALLBACK SIM) ---
   useEffect(() => {
     const fetchHotspots = async () => {
+      setLoadingHotspots(true);
       try {
-        // Try simulated hotspots first
-        const response = await fetch('http://127.0.0.1:8000/hotspots');
+        console.log("Attempting to fetch REAL ML predictions...");
+        const realRes = await fetch('http://127.0.0.1:8000/hotspots/real');
         
-        if (response.ok) {
-          const data = await response.json();
+        if (realRes.ok) {
+          const data = await realRes.json();
           if (data.status === 'success' && data.hotspots) {
-            // Format for the heatmap: [lat, lon, intensity]
-            const formattedHotspots = data.hotspots.map(h => [
-              h.latitude,
-              h.longitude,
-              h.prediction_value,
-            ]);
-            setHotspots(formattedHotspots);
+            const points = data.hotspots.map(h => [h.latitude, h.longitude, h.prediction_value]);
+            setHotspots(points);
+            console.log(`Loaded ${points.length} Real ML points.`);
+            setLoadingHotspots(false);
             return;
           }
         }
-        
-        // Fallback to real ML predictions if simulated fails
-        const realResponse = await fetch('http://127.0.0.1:8000/hotspots/real');
-        if (realResponse.ok) {
-          const realData = await realResponse.json();
-          if (realData.status === 'success' && realData.hotspots) {
-            const formattedHotspots = realData.hotspots.map(h => [
-              h.latitude,
-              h.longitude,
-              h.prediction_value,
-            ]);
-            setHotspots(formattedHotspots);
+
+        console.log("Real model unavailable. Falling back to simulation...");
+        const simRes = await fetch('http://127.0.0.1:8000/hotspots');
+        if (simRes.ok) {
+          const data = await simRes.json();
+          if (data.status === 'success' && data.hotspots) {
+            const points = data.hotspots.map(h => [h.latitude, h.longitude, h.prediction_value]);
+            setHotspots(points);
+            console.log(`Loaded ${points.length} Simulated points.`);
           }
         }
-      } catch (error) {
-        console.error("Error fetching hotspots:", error);
-        setHotspots([]);
+      } catch (err) {
+        console.error("Failed to load hotspots:", err);
+      } finally {
+        setLoadingHotspots(false);
       }
     };
 
     fetchHotspots();
   }, []);
 
+  // --- EFFECT 3: LIVE TAG POLLING ---
+  useEffect(() => {
+    const fetchEvents = () => {
+      fetch('http://127.0.0.1:8000/events?limit=50')
+        .then(res => res.ok ? res.json() : { events: [] })
+        .then(data => {
+          if (data.events) {
+            // Keep only the latest event per shark for the markers, but show history in feed
+            setLiveEvents(data.events);
+          }
+        })
+        .catch(err => console.error("Event polling error:", err));
+    };
+
+    fetchEvents(); // Initial fetch
+    const interval = setInterval(fetchEvents, 2000); // Poll every 2 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- HELPER: Get Unique Sharks for Map Markers ---
+  const uniqueSharks = Array.from(new Set(liveEvents.map(e => e.tag_id)))
+    .map(id => {
+      return liveEvents.find(e => e.tag_id === id);
+    });
 
   return (
-    <div className="app-container">
-      <aside className="sidebar">
-        <h1 className="title">Shark Foraging Dashboard</h1>
-        
-        <div className="sidebar-section">
-          <h2>Controls</h2>
-          <label htmlFor="model-select">Select Model</label>
-          <select id="model-select">
-            <option>Model A (XGBoost)</option>
-            <option>Baseline (Logistic)</option>
-          </select>
-
-          <label htmlFor="date-select">Select Date</label>
-          <input type="date" id="date-select" />
+    <div style={styles.container}>
+      
+      {/* --- SIDEBAR --- */}
+      <aside style={styles.sidebar}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>SharkTrack AI</h1>
+          <div style={styles.subtitle}>Real-time Foraging Habitat Monitor</div>
         </div>
 
-        <div className="sidebar-section">
-          <h2>Live Tag Events</h2>
+        {/* Status Card */}
+        <div style={styles.statusCard}>
+          <div>
+            <div style={styles.statusIndicator(isOnline)}></div>
+            <span style={{fontWeight: 'bold', fontSize: '0.9rem'}}>
+              {isOnline ? "System Operational" : "System Offline"}
+            </span>
+          </div>
+          <div style={{fontSize: '0.8rem', color: '#94a3b8'}}>v1.0.0</div>
+        </div>
+
+        {/* Controls */}
+        <div style={styles.sectionTitle}>Layers</div>
+        <div style={styles.toggleContainer} onClick={() => setShowHeatmap(!showHeatmap)}>
+          <input 
+            type="checkbox" 
+            checked={showHeatmap} 
+            readOnly 
+            style={{marginRight: '10px', cursor: 'pointer'}}
+          />
+          <span>Show ML Habitat Heatmap</span>
+        </div>
+        {loadingHotspots && <div style={{fontSize: '0.8rem', color: '#eab308'}}>Loading ML Model...</div>}
+
+        {/* Live Feed */}
+        <div style={styles.sectionTitle}>Live Telemetry ({liveEvents.length})</div>
+        <div style={styles.eventList}>
           {liveEvents.length === 0 ? (
-            <p>No live events...</p>
+             <div style={{color: '#64748b', fontStyle: 'italic'}}>Waiting for tag data...</div>
           ) : (
-            // Use .slice(0, 10) to only show the 10 most recent
-            liveEvents.slice(0, 10).map(evt => (
-              <div key={evt.id} className="event-card">
-                <strong>Tag {evt.tag_id}:</strong> {evt.event_trigger}
+            liveEvents.slice(0, 15).map((evt) => (
+              <div key={evt.id} style={styles.eventCard(evt.event_trigger)}>
+                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                  <strong style={{color: '#e2e8f0'}}>{evt.tag_id}</strong>
+                  <span style={{fontSize: '0.75rem', opacity: 0.7}}>
+                    {new Date(evt.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div style={{fontSize: '0.85rem'}}>
+                  {evt.event_trigger === 'possible_feeding' ? '🍖 FEEDING EVENT' : '🏊 Transiting'}
+                </div>
+                <div style={{fontSize: '0.75rem', marginTop:'4px', color:'#94a3b8'}}>
+                  Conf: {(evt.event_confidence * 100).toFixed(0)}% | Depth: {evt.depth_m}m
+                </div>
               </div>
             ))
           )}
         </div>
-
-        <div className="sidebar-section">
-            <h2>API Status</h2>
-            <p className="api-status">{apiStatus}</p>
-        </div>
       </aside>
-      
-      <main className="map-view">
-        <MapContainer center={mapPosition} zoom={13} style={{ height: '100%', width: '100%' }}>
+
+      {/* --- MAP VIEW --- */}
+      <main style={styles.mapWrapper}>
+        <MapContainer 
+          center={centerPos} 
+          zoom={11} 
+          style={{ height: '100%', width: '100%' }}
+        >
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
 
-          {/* --- ADD THE HEATMAP LAYER --- */}
-          {hotspots.length > 0 && (
+          {/* HEATMAP LAYER */}
+          {showHeatmap && hotspots.length > 0 && (
             <HeatmapLayer
               points={hotspots}
               longitudeExtractor={m => m[1]}
               latitudeExtractor={m => m[0]}
               intensityExtractor={m => m[2]}
-              radius={30}
-              blur={20}
+              radius={20}
+              blur={15}
               max={1.0}
+              minOpacity={0.4}
+              gradient={{0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}}
             />
           )}
 
-          {/* --- RENDER THE LIVE TAGS --- */}
-          {liveEvents.map(evt => (
-             <Marker key={evt.id} position={[evt.latitude, evt.longitude]}>
+          {/* SHARK MARKERS */}
+          {uniqueSharks.map(evt => (
+             <Marker key={evt.tag_id} position={[evt.latitude, evt.longitude]}>
                <Popup>
-                 <strong>Tag {evt.tag_id}</strong><br />
-                 Event: {evt.event_trigger}<br />
-                 Confidence: {evt.event_confidence}<br />
-                 Timestamp: {new Date(evt.timestamp).toLocaleString()}
+                 <div style={{minWidth: '150px'}}>
+                   <h3 style={{margin: '0 0 5px 0', color: '#0f172a'}}>{evt.tag_id}</h3>
+                   <div style={{marginBottom: '5px'}}>
+                     Status: <strong>{evt.event_trigger}</strong>
+                   </div>
+                   <div style={{fontSize: '0.9em'}}>
+                    Temp: {evt.env_temperature_c}°C<br/>
+                    Depth: {evt.depth_m}m<br/>
+                    Battery: {evt.battery_level_pct}%
+                   </div>
+                   <div style={{fontSize: '0.8em', color: '#666', marginTop: '5px'}}>
+                     Last seen: {new Date(evt.timestamp).toLocaleTimeString()}
+                   </div>
+                 </div>
                </Popup>
              </Marker>
           ))}
@@ -185,4 +319,3 @@ function App() {
 }
 
 export default App;
-

@@ -28,7 +28,7 @@ async def generate_dummy_hotspots():
     Generates a grid of dummy prediction data and saves to MongoDB.
     This simulates the output of the ML model.
     """
-    if client is None:
+    if hotspots_collection is None:
         print("Database not connected. Exiting.")
         return
 

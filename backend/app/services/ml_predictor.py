@@ -131,11 +131,11 @@ def generate_real_hotspots() -> List[Dict[str, float]]:
             logger.info(f"SST bounds: {sst_ds.bounds}")
             logger.info(f"SST resolution: {sst_ds.res}")
             
-            # 3. Generate 40×40 grid
+            # 3. Generate larger grid for better coverage
             center_lat = -13.00
             center_lon = 46.23
-            spacing = 0.02  # degrees
-            grid_size = 40
+            spacing = 0.05  # degrees (increased from 0.02 for larger area)
+            grid_size = 100  # increased from 40 for much larger coverage
             
             # Calculate grid bounds
             half_span = (grid_size - 1) * spacing / 2
@@ -199,19 +199,34 @@ def generate_real_hotspots() -> List[Dict[str, float]]:
                 
                 # Prepare input for model (reshape to (1, 2) for single prediction)
                 try:
-                    X = np.array([[float(chl_val), float(sst_val)]], dtype=np.float32)
+                    # Apply scaling: SST data appears to be scaled by 100
+                    scaled_sst = float(sst_val) / 100.0
+                    X = np.array([[float(chl_val), scaled_sst]], dtype=np.float32)
+                    
+                    # Debug logging
+                    if (idx + 1) % 100 == 0:
+                        logger.info(f"Sample input at ({lat:.4f}, {lon:.4f}): Chl={chl_val:.6f}, SST_raw={sst_val:.2f}, SST_scaled={scaled_sst:.2f}")
                     
                     # Run prediction
                     prediction = model.predict(X)
                     
                     # Handle different prediction output shapes
                     if isinstance(prediction, np.ndarray):
-                        pred_value = float(prediction[0])
+                        raw_pred_value = float(prediction[0])
                     else:
-                        pred_value = float(prediction)
+                        raw_pred_value = float(prediction)
                     
-                    # Clip to [0, 1] range
-                    pred_value = np.clip(pred_value, 0.0, 1.0)
+                    # Apply sigmoid transformation to convert raw predictions to [0,1] probabilities
+                    pred_value = 1.0 / (1.0 + np.exp(-raw_pred_value))
+                    
+                    # Scale up very small values for visualization (multiply by 1e20 to make tiny probabilities visible)
+                    if pred_value > 0 and pred_value < 1e-10:
+                        pred_value = pred_value * 1e20
+                        pred_value = np.clip(pred_value, 0.0, 1.0)  # Re-clip after scaling
+                    
+                    # Debug logging
+                    if (idx + 1) % 100 == 0:
+                        logger.info(f"Processed {idx + 1}/{total_points} points ({len(valid_predictions)} valid, {skipped} skipped)")
                     
                     # Store valid prediction
                     valid_predictions.append({

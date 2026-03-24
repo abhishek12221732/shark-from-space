@@ -5,6 +5,7 @@ This is the entry point for the Shark Foraging Project API.
 """
 
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,13 +20,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+
+# Lifespan context manager for startup and shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info(f"Starting {settings.api_title} v{settings.api_version}")
+    
+    # Test database connection
+    db = get_database()
+    if db is None:
+        logger.warning("Database connection failed - some features may be unavailable")
+    else:
+        logger.info("Database connection established")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down application")
+    from app.core.database import close_database
+    close_database()
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
     description="API for shark habitat prediction and tracking",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -44,6 +68,7 @@ app.include_router(api_router, prefix="/api/v1")
 from app.api.endpoints import events, hotspots
 app.include_router(events.router, prefix="/events", tags=["events"])
 app.include_router(hotspots.router, prefix="/hotspots", tags=["hotspots"])
+
 
 # Root endpoint
 @app.get("/")
@@ -66,29 +91,6 @@ async def health_check():
         "status": "healthy" if db_status else "degraded",
         "database": "connected" if db_status else "disconnected"
     }
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    logger.info(f"Starting {settings.api_title} v{settings.api_version}")
-    
-    # Test database connection
-    db = get_database()
-    if db is None:
-        logger.warning("Database connection failed - some features may be unavailable")
-    else:
-        logger.info("Database connection established")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down application")
-    from app.core.database import close_database
-    close_database()
 
 
 if __name__ == "__main__":

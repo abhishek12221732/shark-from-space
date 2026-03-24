@@ -19,7 +19,7 @@ ENV_FILE_PATH = BASE_DIR / ".env"
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # MongoDB connection
+    # MongoDB connection (required)
     mongo_connection_string: str
     
     # API settings
@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+
+    def __init__(self, **values):
+        super().__init__(**values)
+        if not self.mongo_connection_string or self.mongo_connection_string.strip() == "":
+            raise ValueError("mongo_connection_string is required and must not be empty")
     
     # CORS settings
     cors_origins: List[str] = [
