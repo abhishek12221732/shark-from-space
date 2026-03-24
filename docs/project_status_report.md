@@ -112,7 +112,6 @@ The Shark Foraging Project is a real-time IoT-based shark tracking and habitat p
 - ❌ **Security Risk:** Database credentials hardcoded in source code
   ```python
   # SECURITY ISSUE: Credentials exposed
-  mongodb+srv://abhis1732:abhi2397A@cluster0.n6nzh.mongodb.net/...
   ```
 - ❌ **No Environment Configuration:** Missing `.env` file for secure credential management
 - ❌ **No Connection Pooling Config:** Default connection settings may not be optimal

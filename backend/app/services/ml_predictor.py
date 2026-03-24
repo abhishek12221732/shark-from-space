@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 _cache: Optional[List[Dict[str, float]]] = None
 _cache_lock = threading.Lock()
 _cache_key: Optional[str] = None
+_truth_cache: Optional[List[Dict[str, float]]] = None
+_truth_cache_lock = threading.Lock()
 
 
 def generate_real_hotspots() -> List[Dict[str, float]]:
@@ -296,3 +298,67 @@ def clear_cache() -> None:
         _cache_key = None
         logger.info("Cache cleared")
 
+def get_ground_truth_hotspots() -> List[Dict[str, float]]:
+    """
+    Reads the historical ground truth data from the 2020 suitability GeoTIFF.
+    Uses the exact same grid as the ML predictions for perfect 1:1 comparison.
+    """
+    global _truth_cache
+    
+    with _truth_cache_lock:
+        if _truth_cache is not None:
+            logger.info("Truth Cache hit: returning cached historical data")
+            return _truth_cache.copy()
+
+    logger.info("Truth Cache miss: generating historical data grid")
+    
+    try:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        truth_path = backend_dir / "data" / "EarthEngine_Exports" / "Shark_Habitat_Suitability_2020.tif"
+        
+        if not truth_path.exists():
+            raise FileNotFoundError(f"Ground truth GeoTIFF not found: {truth_path}")
+            
+        truth_ds = rasterio.open(truth_path)
+        
+        # Using your exact grid parameters from generate_real_hotspots
+        center_lat, center_lon = -13.00, 46.23
+        spacing, grid_size = 0.05, 100
+        
+        coords = []
+        for i in range(grid_size):
+            for j in range(grid_size):
+                lat = center_lat + (i - grid_size/2 + 0.5) * spacing
+                lon = center_lon + (j - grid_size/2 + 0.5) * spacing
+                coords.append((lon, lat))
+                
+        truth_samples = list(truth_ds.sample(coords))
+        valid_truth = []
+        
+        for coord, sample in zip(coords, truth_samples):
+            lon, lat = coord
+            val = sample[0] if len(sample) > 0 else None
+            
+            # Check for valid data (not NaN or masked)
+            if val is not None and not np.isnan(val) and not (hasattr(val, '__array__') and np.ma.is_masked(val)):
+                # Normalize the value if needed to keep it between 0 and 1 for the heatmap
+                suitability = float(val)
+                # If your raw tif data goes above 1, you might need: suitability = min(1.0, max(0.0, suitability))
+                
+                valid_truth.append({
+                    "latitude": float(lat),
+                    "longitude": float(lon),
+                    "prediction_value": suitability
+                })
+                
+        valid_truth.sort(key=lambda x: (-x["latitude"], x["longitude"]))
+        
+        with _truth_cache_lock:
+            _truth_cache = valid_truth
+            
+        truth_ds.close()
+        return valid_truth
+
+    except Exception as e:
+        logger.error(f"Error reading ground truth data: {e}", exc_info=True)
+        raise IOError(f"Failed to read historical data: {e}") from e

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 
 from app.core.database import get_hotspots_collection
-from app.services.ml_predictor import generate_real_hotspots
+from app.services.ml_predictor import generate_real_hotspots, get_ground_truth_hotspots
 from app.utils.helpers import hotspot_helper
 
 logger = logging.getLogger(__name__)
@@ -102,3 +102,22 @@ async def get_real_hotspots() -> Dict[str, Any]:
             detail=f"Failed to generate predictions: {str(e)}"
         )
 
+@router.get("/truth")
+async def get_truth_hotspots() -> Dict[str, Any]:
+    """
+    Retrieve historical ground truth data for validation comparison.
+    """
+    try:
+        logger.info("Fetching historical ground truth hotspots")
+        truth_data = get_ground_truth_hotspots()
+        
+        return {
+            "status": "success",
+            "hotspots": truth_data
+        }
+    except Exception as e:
+        logger.error(f"Error fetching truth data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch historical data: {str(e)}"
+        )
