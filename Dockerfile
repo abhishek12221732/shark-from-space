@@ -2,10 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies (for rasterio/GDAL)
+# Install system dependencies (for rasterio/GDAL and data download)
 RUN apt-get update && apt-get install -y \
     gdal-bin \
     libgdal-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements from root directory and install Python dependencies
@@ -17,6 +18,15 @@ COPY backend/app ./app
 
 # Copy scripts directory
 COPY backend/scripts ./scripts
+
+# Download real data files from GitHub release
+RUN mkdir -p ./data/EarthEngine_Exports && \
+    cd ./data/EarthEngine_Exports && \
+    wget -q https://github.com/abhishek12221732/shark-from-space/releases/download/v1.0.0-data/MODIS_Chlorophyll_2020_Mean.tif && \
+    wget -q https://github.com/abhishek12221732/shark-from-space/releases/download/v1.0.0-data/NOAA_Pathfinder_SST_2020_Mean.tif && \
+    wget -q https://github.com/abhishek12221732/shark-from-space/releases/download/v1.0.0-data/Shark_Habitat_Suitability_2020.tif && \
+    wget -q https://github.com/abhishek12221732/shark-from-space/releases/download/v1.0.0-data/shark_habitat_model.pkl && \
+    cd /app
 
 # Expose port
 EXPOSE 8000
