@@ -25,15 +25,13 @@ function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensity
     const heatPoints = points
       .map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)])
       .map(([lat, lng, intensity]) => {
-        const exponential = Math.pow(Math.max(0, intensity), 1.2) * 3;
+        const exponential = Math.pow(Math.max(0, intensity), 1.1) * 2.5;
         return [lat, lng, Math.min(1, exponential)];
       })
-      .filter(([_, __, intensity]) => intensity > 0.05);
+      .filter(([_, __, intensity]) => intensity > 0.03);
 
     if (heatPoints.length === 0) return;
 
-    const maxIntensity = Math.max(...heatPoints.map(p => p[2]));
-    
     const layer = L.heatLayer(heatPoints, {
       radius,
       blur,
@@ -445,7 +443,7 @@ function App() {
               radius={12}
               blur={6}
               minOpacity={0.5}
-              gradient={{0.0: '#0000ff', 0.25: '#00ff00', 0.5: '#ffff00', 0.75: '#ff7f00', 1.0: '#ff0000'}}
+              gradient={{0.0: '#0a4d3c', 0.25: '#10b981', 0.5: '#34d399', 0.75: '#6ee7b7', 1.0: '#a7f3d0'}}
             />
           )}
 
