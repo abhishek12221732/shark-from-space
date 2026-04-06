@@ -46,6 +46,7 @@ const styles = {
     display: 'flex', height: '100vh', width: '100vw',
     fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     backgroundColor: '#f8fafc', color: '#0f172a', overflow: 'hidden',
+    margin: 0, padding: 0, boxSizing: 'border-box',
   },
   sidebar: {
     width: '350px', backgroundColor: '#ffffff', borderRight: '1px solid #e2e8f0',
@@ -77,7 +78,7 @@ const styles = {
     borderLeftWidth: '4px',
     padding: '12px', borderRadius: '4px', marginBottom: '10px', fontSize: '0.9rem',
   }),
-  mapWrapper: { flex: 1, position: 'relative' },
+  mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden', margin: 0, padding: 0 },
   validationCard: {
     backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px',
     padding: '12px', marginBottom: '20px'
@@ -409,6 +410,8 @@ function App() {
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+            crossOrigin="anonymous"
+            maxZoom={19}
           />
 
           {activeLayer === 'ml' && mlHotspots.length > 0 && (
