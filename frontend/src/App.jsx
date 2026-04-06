@@ -16,17 +16,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 80, blur = 60, max = 1.0, minOpacity = 0.05, gradient = {} }) {
+function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 100, blur = 80, max = 1.0, minOpacity = 0.15, gradient = {} }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map || !points || points.length === 0) return;
 
-    const heatPoints = points.map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)]);
+    const heatPoints = points
+      .map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)])
+      .map(([lat, lng, intensity]) => [lat, lng, Math.min(1, intensity * 2.5)]);
+
+    const computedMax = Math.max(...heatPoints.map(p => p[2]), 0.25);
+
     const layer = L.heatLayer(heatPoints, {
       radius,
       blur,
-      max,
+      max: Math.max(max, computedMax),
       minOpacity,
       gradient,
     });
