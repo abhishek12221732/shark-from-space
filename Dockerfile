@@ -16,9 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 
 # Copy data, model, and scripts directories
-COPY data ./data
+COPY backend/data ./data
 COPY model ./model
-COPY scripts ./scripts
+COPY backend/scripts ./scripts
 
 # Expose port
 EXPOSE 8000
