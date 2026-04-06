@@ -38,6 +38,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost",
         "http://localhost:5173",
+        "https://shark-from-space.onrender.com",
+        "https://shark-from-space-1.onrender.com",
     ]
     
     class Config:
