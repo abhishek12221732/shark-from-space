@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, Polyline } from 'react-leaflet';
-import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.heat';
 import L from 'leaflet';
 
 // --- LEAFLET ICON FIX ---
@@ -15,6 +15,30 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 80, blur = 60, max = 1.0, minOpacity = 0.05, gradient = {} }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !points || points.length === 0) return;
+
+    const heatPoints = points.map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)]);
+    const layer = L.heatLayer(heatPoints, {
+      radius,
+      blur,
+      max,
+      minOpacity,
+      gradient,
+    });
+
+    layer.addTo(map);
+    return () => {
+      map.removeLayer(layer);
+    };
+  }, [map, points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius, blur, max, minOpacity, gradient]);
+
+  return null;
+}
 
 // --- LIGHT MODE INLINE STYLES ---
 const styles = {
