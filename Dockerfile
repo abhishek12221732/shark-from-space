@@ -15,9 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY backend/app ./app
 
-# Copy data, model, and scripts directories
-COPY backend/data ./data
-COPY model ./model
+# Copy scripts directory
 COPY backend/scripts ./scripts
 
 # Expose port
