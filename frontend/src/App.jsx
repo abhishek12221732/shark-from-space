@@ -141,7 +141,7 @@ function RecenterButton({ sharks, fallbackCenter }) {
 
 function App() {
   // API URL configuration
-  const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
   
   const [apiStatus, setApiStatus] = useState('Connecting...');
   const [isOnline, setIsOnline] = useState(false);
@@ -177,7 +177,7 @@ function App() {
     const fetchHotspots = async () => {
       setLoadingLayer(true);
       try {
-        const mlRes = await fetch(`${API_URL}/hotspots/real`);
+        const mlRes = await fetch(`${API_URL}/api/v1/hotspots/real`);
         if (mlRes.ok) {
           const data = await mlRes.json();
           if (data.status === 'success' && data.hotspots) {
@@ -185,7 +185,7 @@ function App() {
           }
         }
 
-        const truthRes = await fetch(`${API_URL}/hotspots/truth`);
+        const truthRes = await fetch(`${API_URL}/api/v1/hotspots/truth`);
         if (truthRes.ok) {
           const tData = await truthRes.json();
           if (tData.status === 'success' && tData.hotspots) {
@@ -204,7 +204,7 @@ function App() {
   useEffect(() => {
     const fetchEvents = () => {
       // BUMPED LIMIT TO 200 to get a good tail of historical data for the path
-      fetch(`${API_URL}/events?limit=200`)
+      fetch(`${API_URL}/api/v1/events?limit=200`)
         .then(res => res.ok ? res.json() : { events: [] })
         .then(data => { if (data.events) setLiveEvents(data.events); })
         .catch(err => console.error("Event polling error:", err));
