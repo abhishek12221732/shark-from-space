@@ -17,13 +17,10 @@
 
 ### 1. Verify Backend Requirements
 ```bash
-cd backend
+# requirements.txt is in ROOT directory (not backend/)
 cat requirements.txt | grep gunicorn
 ```
-If `gunicorn` is not there, add it:
-```
-gunicorn>=21.0.0
-```
+If `gunicorn` is not there, it should be added (already done).
 
 ### 2. Test Build Locally (Optional)
 ```bash
