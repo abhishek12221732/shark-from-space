@@ -372,11 +372,14 @@ def get_ground_truth_hotspots() -> List[Dict[str, float]]:
                 suitability = float(val)
                 # If your raw tif data goes above 1, you might need: suitability = min(1.0, max(0.0, suitability))
                 
-                valid_truth.append({
-                    "latitude": float(lat),
-                    "longitude": float(lon),
-                    "prediction_value": suitability
-                })
+                # Filter out low-value land areas to prevent heatmap bleeding onto coast/land
+                # Only include points with meaningful suitability (>0.25)
+                if suitability > 0.25:
+                    valid_truth.append({
+                        "latitude": float(lat),
+                        "longitude": float(lon),
+                        "prediction_value": suitability
+                    })
                 
         valid_truth.sort(key=lambda x: (-x["latitude"], x["longitude"]))
         
