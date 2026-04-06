@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 30, blur = 25, max = 2.0, minOpacity = 0.25, gradient = {} }) {
+function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 15, blur = 8, max = 1.0, minOpacity = 0.4, gradient = {} }) {
   const map = useMap();
 
   useEffect(() => {
@@ -25,19 +25,21 @@ function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensity
     const heatPoints = points
       .map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)])
       .map(([lat, lng, intensity]) => {
-        const scaled = Math.min(2, Math.pow(intensity * 8, 0.9));
-        return [lat, lng, scaled];
-      });
+        const exponential = Math.pow(Math.max(0, intensity), 1.2) * 3;
+        return [lat, lng, Math.min(1, exponential)];
+      })
+      .filter(([_, __, intensity]) => intensity > 0.05);
 
-    const validPoints = heatPoints.filter(([_, __, intensity]) => intensity > 0.02);
-    const computedMax = Math.max(...validPoints.map(p => p[2]), 0.5);
+    if (heatPoints.length === 0) return;
 
-    const layer = L.heatLayer(validPoints, {
+    const maxIntensity = Math.max(...heatPoints.map(p => p[2]));
+    
+    const layer = L.heatLayer(heatPoints, {
       radius,
       blur,
-      max: Math.max(max, computedMax),
+      max: 1,
       minOpacity,
-      gradient,
+      gradient: gradient || {0.0: '#0000ff', 0.25: '#00ff00', 0.5: '#ffff00', 0.75: '#ff7f00', 1.0: '#ff0000'},
     });
 
     layer.addTo(map);
@@ -427,12 +429,10 @@ function App() {
               longitudeExtractor={m => m[1]}
               latitudeExtractor={m => m[0]}
               intensityExtractor={m => m[2]}
-              radius={80}
-              blur={60}
-              max={1.0}
-              minOpacity={0.05}
-              maxOpacity={0.5}
-              gradient={{0.3: '#93c5fd', 0.6: '#4ade80', 0.8: '#facc15', 1.0: '#ef4444'}}
+              radius={12}
+              blur={6}
+              minOpacity={0.5}
+              gradient={{0.0: '#0000ff', 0.25: '#00ff00', 0.5: '#ffff00', 0.75: '#ff7f00', 1.0: '#ff0000'}}
             />
           )}
 
@@ -442,12 +442,10 @@ function App() {
               longitudeExtractor={m => m[1]}
               latitudeExtractor={m => m[0]}
               intensityExtractor={m => m[2]}
-              radius={80}
-              blur={60}
-              max={1.0}
-              minOpacity={0.05}
-              maxOpacity={0.5}
-              gradient={{0.3: '#a7f3d0', 0.6: '#34d399', 0.8: '#10b981', 1.0: '#047857'}}
+              radius={12}
+              blur={6}
+              minOpacity={0.5}
+              gradient={{0.0: '#0000ff', 0.25: '#00ff00', 0.5: '#ffff00', 0.75: '#ff7f00', 1.0: '#ff0000'}}
             />
           )}
 
