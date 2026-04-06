@@ -128,6 +128,10 @@ function App() {
   // --- NEW: SELECTED SHARK STATE ---
   const [selectedSharkId, setSelectedSharkId] = useState(null);
   
+  // --- SIMULATOR CONTROL STATE ---
+  const [simulatorRunning, setSimulatorRunning] = useState(false);
+  const [simulatorLoading, setSimulatorLoading] = useState(false);
+  
   const centerPos = [-13.00, 46.23];
 
   useEffect(() => {
@@ -192,6 +196,59 @@ function App() {
     : [];
   const activeShark = selectedSharkEvents[0]; // Most recent data point
   const sharkPath = selectedSharkEvents.map(e => [e.latitude, e.longitude]); // Array of coords for the trail
+
+  // --- SIMULATOR CONTROL HANDLERS ---
+  const startSimulator = async () => {
+    setSimulatorLoading(true);
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/start', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSimulatorRunning(true);
+        console.log("Simulator started:", data);
+      } else {
+        console.error("Failed to start simulator:", data.detail);
+      }
+    } catch (err) {
+      console.error("Error starting simulator:", err);
+    } finally {
+      setSimulatorLoading(false);
+    }
+  };
+
+  const stopSimulator = async () => {
+    setSimulatorLoading(true);
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/stop', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSimulatorRunning(false);
+        console.log("Simulator stopped:", data);
+      } else {
+        console.error("Failed to stop simulator:", data.detail);
+      }
+    } catch (err) {
+      console.error("Error stopping simulator:", err);
+    } finally {
+      setSimulatorLoading(false);
+    }
+  };
+
+  // Check simulator status on mount
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/status');
+        const data = await res.json();
+        if (data.is_running) {
+          setSimulatorRunning(true);
+        }
+      } catch (err) {
+        console.error("Error checking simulator status:", err);
+      }
+    };
+    checkStatus();
+  }, []);
 
   return (
     <div style={styles.container}>
@@ -278,6 +335,40 @@ function App() {
       </aside>
 
       <main style={styles.mapWrapper}>
+        {/* Simulator Toggle Button - Top Right */}
+        <button
+          onClick={simulatorRunning ? stopSimulator : startSimulator}
+          disabled={simulatorLoading}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            zIndex: 1000,
+            padding: '12px 24px',
+            backgroundColor: simulatorRunning ? '#ef4444' : '#22c55e',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: simulatorLoading ? 'not-allowed' : 'pointer',
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            opacity: simulatorLoading ? 0.7 : 1,
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          {simulatorLoading ? (
+            <>⏳ ...</>
+          ) : simulatorRunning ? (
+            <>⏹ Stop Simulator</>
+          ) : (
+            <>▶ Start Simulator</>
+          )}
+        </button>
+
         <MapContainer 
           center={centerPos} 
           zoom={11} 
