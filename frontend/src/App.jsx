@@ -116,6 +116,9 @@ function RecenterButton({ sharks, fallbackCenter }) {
 }
 
 function App() {
+  // API URL configuration
+  const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  
   const [apiStatus, setApiStatus] = useState('Connecting...');
   const [isOnline, setIsOnline] = useState(false);
   const [liveEvents, setLiveEvents] = useState([]);
@@ -136,7 +139,7 @@ function App() {
 
   useEffect(() => {
     const checkHealth = () => {
-      fetch('http://127.0.0.1:8000/')
+      fetch(`${API_URL}/`)
         .then(res => res.json())
         .then(data => { setApiStatus(data.status || 'Connected'); setIsOnline(true); })
         .catch(() => { setApiStatus('Offline'); setIsOnline(false); });
@@ -150,7 +153,7 @@ function App() {
     const fetchHotspots = async () => {
       setLoadingLayer(true);
       try {
-        const mlRes = await fetch('http://127.0.0.1:8000/hotspots/real');
+        const mlRes = await fetch(`${API_URL}/hotspots/real`);
         if (mlRes.ok) {
           const data = await mlRes.json();
           if (data.status === 'success' && data.hotspots) {
@@ -158,7 +161,7 @@ function App() {
           }
         }
 
-        const truthRes = await fetch('http://127.0.0.1:8000/hotspots/truth');
+        const truthRes = await fetch(`${API_URL}/hotspots/truth`);
         if (truthRes.ok) {
           const tData = await truthRes.json();
           if (tData.status === 'success' && tData.hotspots) {
@@ -177,7 +180,7 @@ function App() {
   useEffect(() => {
     const fetchEvents = () => {
       // BUMPED LIMIT TO 200 to get a good tail of historical data for the path
-      fetch('http://127.0.0.1:8000/events?limit=200')
+      fetch(`${API_URL}/events?limit=200`)
         .then(res => res.ok ? res.json() : { events: [] })
         .then(data => { if (data.events) setLiveEvents(data.events); })
         .catch(err => console.error("Event polling error:", err));
@@ -201,7 +204,7 @@ function App() {
   const startSimulator = async () => {
     setSimulatorLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/start', { method: 'POST' });
+      const res = await fetch(`${API_URL}/api/v1/simulator/start`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setSimulatorRunning(true);
@@ -219,7 +222,7 @@ function App() {
   const stopSimulator = async () => {
     setSimulatorLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/stop', { method: 'POST' });
+      const res = await fetch(`${API_URL}/api/v1/simulator/stop`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setSimulatorRunning(false);
@@ -238,7 +241,7 @@ function App() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/v1/simulator/status');
+        const res = await fetch(`${API_URL}/api/v1/simulator/status`);
         const data = await res.json();
         if (data.is_running) {
           setSimulatorRunning(true);
