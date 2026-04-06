@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 100, blur = 80, max = 1.0, minOpacity = 0.15, gradient = {} }) {
+function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius = 30, blur = 25, max = 2.0, minOpacity = 0.25, gradient = {} }) {
   const map = useMap();
 
   useEffect(() => {
@@ -24,11 +24,15 @@ function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensity
 
     const heatPoints = points
       .map(p => [latitudeExtractor(p), longitudeExtractor(p), intensityExtractor(p)])
-      .map(([lat, lng, intensity]) => [lat, lng, Math.min(1, intensity * 2.5)]);
+      .map(([lat, lng, intensity]) => {
+        const scaled = Math.min(2, Math.pow(intensity * 8, 0.9));
+        return [lat, lng, scaled];
+      });
 
-    const computedMax = Math.max(...heatPoints.map(p => p[2]), 0.25);
+    const validPoints = heatPoints.filter(([_, __, intensity]) => intensity > 0.02);
+    const computedMax = Math.max(...validPoints.map(p => p[2]), 0.5);
 
-    const layer = L.heatLayer(heatPoints, {
+    const layer = L.heatLayer(validPoints, {
       radius,
       blur,
       max: Math.max(max, computedMax),
@@ -37,9 +41,7 @@ function HeatmapLayer({ points, latitudeExtractor, longitudeExtractor, intensity
     });
 
     layer.addTo(map);
-    return () => {
-      map.removeLayer(layer);
-    };
+    return () => map.removeLayer(layer);
   }, [map, points, latitudeExtractor, longitudeExtractor, intensityExtractor, radius, blur, max, minOpacity, gradient]);
 
   return null;
