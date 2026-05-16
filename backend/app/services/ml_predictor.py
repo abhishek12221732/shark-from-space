@@ -348,6 +348,12 @@ def get_ground_truth_hotspots() -> List[Dict[str, float]]:
             
         truth_ds = rasterio.open(truth_path)
         
+        # Also open Chlorophyll to use as an ocean mask (to prevent land leakage)
+        chl_path = backend_dir / "data" / "EarthEngine_Exports" / "MODIS_Chlorophyll_2020_Mean.tif"
+        chl_ds = None
+        if chl_path.exists():
+            chl_ds = rasterio.open(chl_path)
+        
         # Using your exact grid parameters from generate_real_hotspots
         center_lat, center_lon = -13.00, 46.23
         spacing, grid_size = 0.05, 100
@@ -360,19 +366,30 @@ def get_ground_truth_hotspots() -> List[Dict[str, float]]:
                 coords.append((lon, lat))
                 
         truth_samples = list(truth_ds.sample(coords))
+        chl_samples = list(chl_ds.sample(coords)) if chl_ds else [None] * len(coords)
+        
         valid_truth = []
         
-        for coord, sample in zip(coords, truth_samples):
+        for coord, truth_sample, chl_sample in zip(coords, truth_samples, chl_samples):
             lon, lat = coord
-            val = sample[0] if len(sample) > 0 else None
+            
+            # Apply ocean mask if available
+            if chl_sample is not None:
+                chl_val = chl_sample[0] if len(chl_sample) > 0 else None
+                chl_valid = (
+                    chl_val is not None and
+                    not np.isnan(chl_val) and
+                    not (hasattr(chl_val, '__array__') and np.ma.is_masked(chl_val))
+                )
+                if not chl_valid:
+                    continue  # Skip land/invalid ocean points
+            
+            val = truth_sample[0] if len(truth_sample) > 0 else None
             
             # Check for valid data (not NaN or masked)
             if val is not None and not np.isnan(val) and not (hasattr(val, '__array__') and np.ma.is_masked(val)):
-                # Normalize the value if needed to keep it between 0 and 1 for the heatmap
                 suitability = float(val)
-                # If your raw tif data goes above 1, you might need: suitability = min(1.0, max(0.0, suitability))
                 
-                # Filter out low-value land areas to prevent heatmap bleeding onto coast/land
                 # Only include points with meaningful suitability (>0.25)
                 if suitability > 0.25:
                     valid_truth.append({
@@ -387,6 +404,9 @@ def get_ground_truth_hotspots() -> List[Dict[str, float]]:
             _truth_cache = valid_truth
             
         truth_ds.close()
+        if chl_ds:
+            chl_ds.close()
+            
         return valid_truth
 
     except Exception as e:
