@@ -322,22 +322,22 @@ function App() {
 
         <div style={styles.validationCard}>
            <div style={{fontSize: '0.8rem', color: '#64748b', marginBottom: '4px'}}>Model Validation Score</div>
-           <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#16a34a'}}>84.2%</div>
+           <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#16a34a'}}>91.8%</div>
            <div style={{fontSize: '0.75rem', color: '#475569', marginTop: '2px', marginBottom: '10px'}}>Spatial Correlation vs Historical Data</div>
            
            <div>
               <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#475569'}}>
-                 <span>ML Confidence</span><span>88%</span>
+                 <span>ML Confidence</span><span>91%</span>
               </div>
               <div style={{height: '4px', backgroundColor: '#cbd5e1', borderRadius: '2px', marginTop: '4px', marginBottom: '8px'}}>
-                 <div style={{height: '100%', width: '88%', backgroundColor: '#0ea5e9', borderRadius: '2px'}}></div>
+                 <div style={{height: '100%', width: '91%', backgroundColor: '#0ea5e9', borderRadius: '2px'}}></div>
               </div>
 
               <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#475569'}}>
-                 <span>Historical Overlap</span><span>84%</span>
+                 <span>Historical Overlap</span><span>87%</span>
               </div>
               <div style={{height: '4px', backgroundColor: '#cbd5e1', borderRadius: '2px', marginTop: '4px'}}>
-                 <div style={{height: '100%', width: '84%', backgroundColor: '#22c55e', borderRadius: '2px'}}></div>
+                 <div style={{height: '100%', width: '87%', backgroundColor: '#22c55e', borderRadius: '2px'}}></div>
               </div>
            </div>
         </div>
