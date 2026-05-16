@@ -2,11 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies (for rasterio/GDAL and data download)
+# Install system dependencies (for rasterio/GDAL, data download, and procps for process management)
 RUN apt-get update && apt-get install -y \
     gdal-bin \
     libgdal-dev \
     wget \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements from root directory and install Python dependencies
