@@ -41,6 +41,12 @@ async def start_simulator() -> Dict[str, Any]:
                 status_code=400,
                 detail="Simulator is already running"
             )
+            
+        # Ensure no orphaned processes are running before we start
+        try:
+            subprocess.run(["pkill", "-f", "tag_simulator.py"], capture_output=True)
+        except Exception as e:
+            logger.debug(f"pkill check failed or not available: {e}")
         
         try:
             # Navigate from: app/api/endpoints/simulator.py -> backend directory
@@ -105,55 +111,79 @@ async def stop_simulator() -> Dict[str, Any]:
     global _simulator_process
     
     with _simulator_lock:
-        if _simulator_process is None:
-            raise HTTPException(
-                status_code=400,
-                detail="No simulator is currently running"
-            )
+        killed_any = False
         
-        try:
-            # Terminate the process gracefully
-            _simulator_process.terminate()
-            
+        if _simulator_process is not None:
             try:
-                _simulator_process.wait(timeout=5)
-                logger.info(f"Simulator process terminated (PID: {_simulator_process.pid})")
-            except subprocess.TimeoutExpired:
-                # Force kill if graceful termination times out
-                _simulator_process.kill()
-                _simulator_process.wait()
-                logger.warning(f"Simulator process force-killed (PID: {_simulator_process.pid})")
-            
-            _simulator_process = None
-            
-            return {
-                "status": "success",
-                "message": "Tag simulator stopped"
-            }
-            
+                # Terminate the process gracefully
+                _simulator_process.terminate()
+                
+                try:
+                    _simulator_process.wait(timeout=5)
+                    logger.info(f"Simulator process terminated (PID: {_simulator_process.pid})")
+                except subprocess.TimeoutExpired:
+                    # Force kill if graceful termination times out
+                    _simulator_process.kill()
+                    _simulator_process.wait()
+                    logger.warning(f"Simulator process force-killed (PID: {_simulator_process.pid})")
+                killed_any = True
+            except Exception as e:
+                logger.error(f"Error stopping tracked simulator: {e}")
+            finally:
+                _simulator_process = None
+                
+        # Catch any orphaned processes (e.g. after a hot reload)
+        try:
+            result = subprocess.run(["pkill", "-f", "tag_simulator.py"], capture_output=True)
+            if result.returncode == 0:
+                logger.info("Killed orphaned tag_simulator.py processes via pkill.")
+                killed_any = True
         except Exception as e:
-            logger.error(f"Failed to stop simulator: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to stop simulator: {str(e)}"
-            )
+            logger.debug(f"pkill failed or not available: {e}")
+            
+        # Always return success so the frontend UI state can sync back to "Start Simulator"
+        return {
+            "status": "success",
+            "message": "Tag simulator stopped (or was already stopped)",
+            "killed_processes": killed_any
+        }
 
 
 @router.get("/status")
 async def simulator_status() -> Dict[str, Any]:
     """
-    Check if the simulator is currently running.
+    Check if the simulator is currently running across any worker.
     
     Returns:
         Status response with running state and PID if applicable
     """
-    global _simulator_process
-    
-    with _simulator_lock:
-        is_running = _simulator_process is not None and _simulator_process.poll() is None
+    try:
+        # Use pgrep to check for the process across the entire OS (multi-worker safe)
+        result = subprocess.run(["pgrep", "-f", "tag_simulator.py"], capture_output=True, text=True)
+        is_running = result.returncode == 0
         
+        pid = None
+        if is_running and result.stdout.strip():
+            # Get the first PID found
+            pid_str = result.stdout.strip().split('\n')[0]
+            try:
+                pid = int(pid_str)
+            except ValueError:
+                pass
+                
         return {
             "status": "success",
             "is_running": is_running,
-            "pid": _simulator_process.pid if is_running else None
+            "pid": pid
         }
+    except Exception as e:
+        logger.error(f"Error checking simulator status: {e}")
+        # Fallback to local memory if pgrep fails
+        global _simulator_process
+        with _simulator_lock:
+            is_running = _simulator_process is not None and _simulator_process.poll() is None
+            return {
+                "status": "success",
+                "is_running": is_running,
+                "pid": _simulator_process.pid if is_running else None
+            }
